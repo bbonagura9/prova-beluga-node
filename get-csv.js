@@ -1,32 +1,52 @@
 'use strict';
 
-var async           = require('async');
-var mysql           = require('mysql');
-var fs              = require('fs');
-var csv_stringify   = require('csv-stringify');
+const async           = require('async');
+const mysql           = require('mysql');
+const fs              = require('fs');
+const csv_stringify   = require('csv-stringify');
 
 async.autoInject({
+    /*
+        Intializes database connection
+    */
     db_connect: (callback) => {
         var connection = mysql.createConnection({
           host     : 'localhost',
-          user     : '',
-          password : '',
-          database : ''
+          user     : 'beluga',
+          password : 'beluga',
+          database : 'beluga_node'
         });
 
         connection.connect();
 
         callback(null, connection);
     },
-    db_query: (db_connect, callback) => {
-        var q = `
+
+    /*
+        Open the output csv file and pipe a csv stringify to it
+    */
+    csv_open: (callback) => {
+        var fstream = fs.createWriteStream('sales.csv', {autoClose: true});
+        var cstream = csv_stringify({quotedString: true});
+        cstream.pipe(fstream);
+
+        callback(null, cstream);
+    },
+
+    /* 
+        Executes query and pipes the output to the stringifier
+        Pipeline diagram:
+            query ---> csv_stringify ---> fs.WriteStream
+    */
+    db_query: (db_connect, csv_open, callback) => {
+        var query = db_connect.query(`
             SELECT
                 fs.sales,
                 fs.at_stamp,
                 dc.name customer_name,
                 ds.name supplier_name,
                 dl.name location_name,
-                DATE_FORMAT(dd.at, '%Y-%m-%d') datestamp,
+                DATE_FORMAT(dd.at, '%Y-%m-%d') date_at,
                 dp.name product_name
             FROM fact_sales fs
             LEFT JOIN dim_customer dc
@@ -40,38 +60,35 @@ async.autoInject({
             LEFT JOIN dim_product dp
                 ON dp.id = fs.product
             ORDER BY
-                fs.at_stamp DESC`;
-        db_connect.query(q, (err, rows, fields) => {
-            if (err) callback(err, null);
-            callback(null, {rows, fields});
+                fs.at_stamp DESC`)
+        .on('error', function(err) {
+            callback(err, null);
+        })
+        .on('fields', function(fields) {
+            csv_open.write(fields.map((v) => v.name));
+        })
+        .on('end', function() {
+            callback(null, null);
+        })
+        .stream()
+        .pipe(csv_open);
+    },
+    /*
+        Closes the database connection
+    */
+    db_close: (db_connect, db_query, callback) => {
+        db_connect.end(function(err) {
+            if(err) callback(err, null);
         });
     },
-    db_close: (db_connect, db_query, callback) => {
-        db_connect.end();
-        callback(null, null);
-    },
-    csv_generate: (db_query, callback) => {
-        csv_stringify(
-            db_query.rows, 
-            {
-                header: true, 
-                columns: db_query.fields.map(v => v.name), 
-                quotedString: true
-            }, 
-            function(err, output){
-                callback(null, output);
-            }
-        );
-    },
-    csv_print: (csv_generate, callback) => {
-        fs.writeFile("./sales.csv", csv_generate, function(err) {
-            if(err) {
-                callback(err, null);
-            }
-
-            console.log("The file sales.csv was saved!");
-        }); 
-    },
+    /*
+        Closes the stringifier pipe
+    */
+    csv_close: (db_query, csv_open, callback) => {
+        csv_open.end(function(err) {
+            if(err) callback(err, null);
+        });
+    }
 }, function(err, results) {
-    console.error('err = ', err);
+    console.log('err = ', err);
 });

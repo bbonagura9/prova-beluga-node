@@ -1,7 +1,7 @@
 {
   "name": "beluga_node",
   "version": "0.0.0",
-  "description": "",
+  "description": "ERROR: No README data found!",
   "main": "get-csv.js",
   "dependencies": {
     "async": "~2.1.2",
