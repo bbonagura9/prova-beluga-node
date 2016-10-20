@@ -1,7 +1,7 @@
 'use strict';
 
-var async      		= require('async');
-var mysql      		= require('mysql');
+var async			= require('async');
+var mysql			= require('mysql');
 var fs 				= require('fs');
 var csv_stringify 	= require('csv-stringify');
 
