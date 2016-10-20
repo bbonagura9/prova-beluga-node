@@ -9,9 +9,9 @@ async.autoInject({
 	db_connect: (callback) => {
 		var connection = mysql.createConnection({
 		  host     : 'localhost',
-		  user     : 'root',
+		  user     : '',
 		  password : '',
-		  database : 'beluga_node'
+		  database : ''
 		});
 
 		connection.connect();
@@ -40,8 +40,7 @@ async.autoInject({
 			LEFT JOIN dim_product dp
 				ON dp.id = fs.product
 			ORDER BY
-				fs.at_stamp DESC
-		`;
+				fs.at_stamp DESC`;
 		db_connect.query(q, (err, rows, fields) => {
 			if (err) callback(err, null);
 			callback(null, {rows, fields});
